@@ -4,15 +4,142 @@ output: html_notebook
 ---
 
 ```{r}
+library(RobustRankAggreg)
+library(oligo)
+library(ggplot2)
+library(pheatmap)
+library(affy)
+library(affycoretools)
+library(hgu133plus2.db)
+```
+
+```{r}
+sdrf_location   <- file.path('data/', "GSE17351_RAW.txt")
+SDRF            <- read.delim(sdrf_location)
+rownames(SDRF)  <- SDRF$sample
+SDRF            <- AnnotatedDataFrame(SDRF)
+
+raw_data        <- oligo::read.celfiles(paste0("data/GSE17351_RAW/", 
+                                        list.files("data/GSE17351_RAW/")),
+                                        verbose = FALSE, phenoData = SDRF)
+pData(raw_data)
+```
+
+```{r}
+Biobase::exprs(raw_data)[1:5, 1:5]
+```
+
+```{r}
+exp_raw <- log2(Biobase::exprs(raw_data))
+PCA_raw <- prcomp(t(exp_raw), scale. = FALSE)
+
+percentVar  <- round(100*PCA_raw$sdev^2/sum(PCA_raw$sdev^2), 1)
+sd_ratio    <- sqrt(percentVar[2] / percentVar[1])
+dataGG      <- data.frame(PC1 = PCA_raw$x[,1], PC2 = PCA_raw$x[,2],
+                          Group = pData(raw_data)$group)
+
+ggplot(dataGG, aes(PC1, PC2)) +
+  geom_point(aes(colour = Group)) +
+  ggtitle("PCA plot of the log-transformed raw expression data") +
+  xlab(paste0("PC1, VarExp: ", percentVar[1], "%")) +
+  ylab(paste0("PC2, VarExp: ", percentVar[2], "%")) +
+  theme(plot.title = element_text(hjust = 0.5))+
+  coord_fixed(ratio = sd_ratio) +
+  scale_color_manual(values = c("darkorange2", "dodgerblue4"))
+```
+```{r}
+oligo::boxplot(raw_data, main = "Boxplot of log2-intensitites for the raw data", ldw = 2)
 ```
 
 
 ```{r}
+norm_data <- oligo::rma(raw_data)
+norm_data <- annotateEset(norm_data, hgu133plus2.db)
+fData(eset)
 ```
-
 
 ```{r}
+oligo::boxplot(norm_data, main = "Boxplot of log2-intensitites for the raw data")
 ```
+
+```{r}
+row_medians_assayData <- Biobase::rowMedians(as.matrix(Biobase::exprs(norm_data)))
+RLE_data              <- sweep(Biobase::exprs(norm_data), 1, row_medians_assayData)
+RLE_data              <- as.data.frame(RLE_data)
+RLE_data_gathered     <- tidyr::gather(RLE_data, patient_array, log2_expression_deviation)
+ggplot2::ggplot(RLE_data_gathered, aes(patient_array, log2_expression_deviation)) +
+  geom_boxplot(outlier.shape = NA) + ylim(c(-1, 1)) + 
+  theme(axis.text.x = element_text(colour = "aquamarine4", angle = 60, 
+                                   size = 6.5, hjust = 1 , face = "bold"))
+```
+
+```{r}
+exp_norm <- log2(Biobase::exprs(norm_data))
+PCA_norm <- prcomp(t(exp_norm), scale. = FALSE)
+
+percentVar  <- round(100*PCA_norm$sdev^2/sum(PCA_norm$sdev^2), 1)
+sd_ratio    <- sqrt(percentVar[2] / percentVar[1])
+dataGG      <- data.frame(PC1 = PCA_norm$x[,1], PC2 = PCA_norm$x[,2],
+                          Group = pData(raw_data)$group)
+
+ggplot(dataGG, aes(PC1, PC2)) +
+  geom_point(aes(colour = Group)) +
+  ggtitle("PCA plot of the calibrated data") +
+  xlab(paste0("PC1, VarExp: ", percentVar[1], "%")) +
+  ylab(paste0("PC2, VarExp: ", percentVar[2], "%")) +
+  theme(plot.title = element_text(hjust = 0.5))+
+  coord_fixed(ratio = sd_ratio) +
+  scale_color_manual(values = c("darkorange2", "dodgerblue4"))
+```
+
+```{r}
+phenotype_names <- ifelse(str_detect(pData
+(palmieri_eset_norm)$Factor.Value.phenotype.,
+"non"), "non_infl.", "infl.")
+disease_names <- ifelse(str_detect(pData
+(palmieri_eset_norm)$Factor.Value.disease.,
+"Crohn"), "CD", "UC")
+annotation_for_heatmap <-
+data.frame(Phenotype = phenotype_names, Disease = disease_names)
+row.names(annotation_for_heatmap) <- row.names(pData(palmieri_eset_norm))
+```
+
+```{r}
+annotation_for_heatmap <- data.frame(Group = pData(norm_data)$group)
+row.names(annotation_for_heatmap) <- row.names(pData(norm_data))
+
+dists <- as.matrix(dist(t(Biobase::exprs(norm_data)), method = "manhattan"))
+rownames(dists) <- row.names(pData(norm_data))
+hmcol <- rev(colorRampPalette(RColorBrewer::brewer.pal(9, "YlOrRd"))(255))
+colnames(dists) <- NULL
+diag(dists) <- NA
+ann_colors <- list(Group = c(Normal = "green", ESCC = "red"))
+
+pheatmap(dists, col = (hmcol),
+         annotation_row = annotation_for_heatmap,
+         annotation_colors = ann_colors,
+         legend = TRUE,
+         treeheight_row = 0,
+         legend_breaks = c(min(dists, na.rm = TRUE),
+                           max(dists, na.rm = TRUE)),
+         legend_labels = (c("small distance", "large distance")),
+         main = "Clustering heatmap for the calibrated samples")
+```
+
+```{r}
+contrast_matrix_CD  <- makeContrasts(I-nI, levels = design_palmieri_CD)
+palmieri_fit_CD     <- eBayes(contrasts.fit(lmFit(palmieri_final[,disease == "CD"],
+                                                  design = design_palmieri_CD),
+                                            contrast_matrix_CD))
+contrast_matrix_UC  <- makeContrasts(I-nI, levels = design_palmieri_UC)
+palmieri_fit_UC     <- eBayes(contrasts.fit(lmFit(palmieri_final[,disease == "UC"],
+                                                  design = design_palmieri_UC),
+                                            contrast_matrix_UC))
+
+table_CD <- topTable(palmieri_fit_CD, number = Inf)
+head(table_CD)
+```
+
 
 ```{r}
 
