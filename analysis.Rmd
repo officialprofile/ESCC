@@ -11,10 +11,18 @@ library(pheatmap)
 library(affy)
 library(affycoretools)
 library(hgu133plus2.db)
+library(limma)
+library(dplyr)
+library(clusterProfiler)
+library(DOSE)
+library(org.Hs.eg.db)
+library(gProfileR)
 ```
 
 ```{r}
 sdrf_location   <- file.path('data/', "GSE17351_RAW.txt")
+
+sdrf_location   <- file.path('data/', "GSE20347_RAW.txt")
 SDRF            <- read.delim(sdrf_location)
 rownames(SDRF)  <- SDRF$sample
 SDRF            <- AnnotatedDataFrame(SDRF)
@@ -22,15 +30,22 @@ SDRF            <- AnnotatedDataFrame(SDRF)
 raw_data        <- oligo::read.celfiles(paste0("data/GSE17351_RAW/", 
                                         list.files("data/GSE17351_RAW/")),
                                         verbose = FALSE, phenoData = SDRF)
+
+raw_data        <- oligo::read.celfiles(paste0("data/GSE20347_RAW/", 
+                                        list.files("data/GSE20347_RAW/")),
+                                        verbose = FALSE, phenoData = SDRF)
 pData(raw_data)
 ```
+
+
+
 
 ```{r}
 Biobase::exprs(raw_data)[1:5, 1:5]
 ```
 
 ```{r}
-exp_raw <- log2(Biobase::exprs(raw_data))
+exp_raw <-Biobase::exprs(raw_data)
 PCA_raw <- prcomp(t(exp_raw), scale. = FALSE)
 
 percentVar  <- round(100*PCA_raw$sdev^2/sum(PCA_raw$sdev^2), 1)
@@ -48,14 +63,14 @@ ggplot(dataGG, aes(PC1, PC2)) +
   scale_color_manual(values = c("darkorange2", "dodgerblue4"))
 ```
 ```{r}
-oligo::boxplot(raw_data, main = "Boxplot of log2-intensitites for the raw data", ldw = 2)
+oligo::boxplot(raw_data, main = "Boxplot of log2-intensitites for the raw data")
 ```
 
 
 ```{r}
 norm_data <- oligo::rma(raw_data)
 norm_data <- annotateEset(norm_data, hgu133plus2.db)
-fData(eset)
+fData(norm_data)
 ```
 
 ```{r}
@@ -74,7 +89,7 @@ ggplot2::ggplot(RLE_data_gathered, aes(patient_array, log2_expression_deviation)
 ```
 
 ```{r}
-exp_norm <- log2(Biobase::exprs(norm_data))
+exp_norm <- Biobase::exprs(norm_data)
 PCA_norm <- prcomp(t(exp_norm), scale. = FALSE)
 
 percentVar  <- round(100*PCA_norm$sdev^2/sum(PCA_norm$sdev^2), 1)
@@ -90,18 +105,6 @@ ggplot(dataGG, aes(PC1, PC2)) +
   theme(plot.title = element_text(hjust = 0.5))+
   coord_fixed(ratio = sd_ratio) +
   scale_color_manual(values = c("darkorange2", "dodgerblue4"))
-```
-
-```{r}
-phenotype_names <- ifelse(str_detect(pData
-(palmieri_eset_norm)$Factor.Value.phenotype.,
-"non"), "non_infl.", "infl.")
-disease_names <- ifelse(str_detect(pData
-(palmieri_eset_norm)$Factor.Value.disease.,
-"Crohn"), "CD", "UC")
-annotation_for_heatmap <-
-data.frame(Phenotype = phenotype_names, Disease = disease_names)
-row.names(annotation_for_heatmap) <- row.names(pData(palmieri_eset_norm))
 ```
 
 ```{r}
@@ -127,21 +130,6 @@ pheatmap(dists, col = (hmcol),
 ```
 
 ```{r}
-contrast_matrix_CD  <- makeContrasts(I-nI, levels = design_palmieri_CD)
-palmieri_fit_CD     <- eBayes(contrasts.fit(lmFit(palmieri_final[,disease == "CD"],
-                                                  design = design_palmieri_CD),
-                                            contrast_matrix_CD))
-contrast_matrix_UC  <- makeContrasts(I-nI, levels = design_palmieri_UC)
-palmieri_fit_UC     <- eBayes(contrasts.fit(lmFit(palmieri_final[,disease == "UC"],
-                                                  design = design_palmieri_UC),
-                                            contrast_matrix_UC))
-
-table_CD <- topTable(palmieri_fit_CD, number = Inf)
-head(table_CD)
-```
-
-
-```{r}
 design                <- model.matrix(~ 0 + factor(rep(1:2, 5)))
 colnames(design)      <- c("Normal", "ESCC")
 contrast.matrix       <- makeContrasts(Normal-ESCC, levels = design)
@@ -154,12 +142,118 @@ fit               <- eBayes(fit)
 ```
 ```{r}
 results <- decideTests(fit)
+results
 summary(results)
 ```
 
 ## Porównanie Kontrola~Margines
 ```{r}
-topTable(fit, coef = "Normal - ESCC", adjust = "BH")
+results <- topTable(fit, coef = "Normal - ESCC", adjust = "BH", number = Inf)
 plotMD(fit, coef = "Normal - ESCC", status = results, cex = 0.2)
 ```
+
+```{r}
+results %>% filter(abs(logFC)>2, adj.P.Val < 0.05)
+```
+```{r}
+filtered_results <- results %>% filter(abs(logFC)>2, adj.P.Val < 0.05)
+```
+
+```{r}
+rownames(filtered_results)
+```
+
+```{r}
+
+```
+
+
+```{r}
+scc_ego <- enrichGO(na.omit(fData(norm_data)[rownames(filtered_results), 'ENTREZID']), 
+                    'org.Hs.eg.db', ont = "BP", pvalueCutoff = 0.05, pAdjustMethod = "none")
+head(scc_ego@result, 10)
+dotplot(scc_ego)
+```
+
+```{r}
+descc <- top_scc_ext[!is.na(top_scc_ext$LOCUSLINK_ID), ]$logFC
+names(descc) <- top_scc_ext[!is.na(top_scc_ext$LOCUSLINK_ID), ]$LOCUSLINK_ID
+edoscc <- enrichDGN(names(descc),  pvalueCutoff = 0.05)
+head(edoscc)
+barplot(edoscc, showCategory=20, title = 'Enrichment score')
+```
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+gse <- gseGO(geneList=order(as.numeric(na.omit(fData(norm_data)[rownames(filtered_results), 'ENTREZID']))), 
+             ont ="ALL", 
+             keyType = "ENTREZID", 
+             nPerm = 10000, 
+             minGSSize = 3, 
+             maxGSSize = 800, 
+             pvalueCutoff = 0.05, 
+             verbose = TRUE, 
+             OrgDb = org.Hs.eg.db, 
+             pAdjustMethod = "none")
+```
+```{r}
+dotplot(gse, showCategory=10, split=".sign")
+```
+
+
+
+```{r}
+data(gcSample)
+xx <- compareCluster(na.omit(fData(norm_data)[rownames(filtered_results), 'ENTREZID']), 
+                     fun="enrichKEGG", organism="hsa", pvalueCutoff=0.05)
+
+plot(xx, type="dot", caption="KEGG Enrichment Comparison")
+```
+
+```{r}
+glist <- list(sample(letters, 4), sample(letters, 10), sample(letters, 12))
+aggregateRanks(glist = glist, N = length(letters))
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
