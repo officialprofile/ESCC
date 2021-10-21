@@ -22,7 +22,6 @@ library(gProfileR)
 ```{r}
 sdrf_location   <- file.path('data/', "GSE17351_RAW.txt")
 
-sdrf_location   <- file.path('data/', "GSE20347_RAW.txt")
 SDRF            <- read.delim(sdrf_location)
 rownames(SDRF)  <- SDRF$sample
 SDRF            <- AnnotatedDataFrame(SDRF)
@@ -31,9 +30,6 @@ raw_data        <- oligo::read.celfiles(paste0("data/GSE17351_RAW/",
                                         list.files("data/GSE17351_RAW/")),
                                         verbose = FALSE, phenoData = SDRF)
 
-raw_data        <- oligo::read.celfiles(paste0("data/GSE20347_RAW/", 
-                                        list.files("data/GSE20347_RAW/")),
-                                        verbose = FALSE, phenoData = SDRF)
 pData(raw_data)
 ```
 
