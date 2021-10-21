@@ -142,6 +142,24 @@ head(table_CD)
 
 
 ```{r}
+design                <- model.matrix(~ 0 + factor(rep(1:2, 5)))
+colnames(design)      <- c("Normal", "ESCC")
+contrast.matrix       <- makeContrasts(Normal-ESCC, levels = design)
+fit                   <- lmFit(exprs(norm_data), design)
 
+plotSA(fit, main = 'Standard deviation versus average log expression')
+fit               <- contrasts.fit(fit, contrast.matrix)
+#fit_adc               <- eBayes(fit_adc, trend = TRUE, robust = TRUE)
+fit               <- eBayes(fit)
+```
+```{r}
+results <- decideTests(fit)
+summary(results)
+```
+
+## Porównanie Kontrola~Margines
+```{r}
+topTable(fit, coef = "Normal - ESCC", adjust = "BH")
+plotMD(fit, coef = "Normal - ESCC", status = results, cex = 0.2)
 ```
 
