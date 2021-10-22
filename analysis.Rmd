@@ -17,6 +17,7 @@ library(clusterProfiler)
 library(DOSE)
 library(org.Hs.eg.db)
 library(gProfileR)
+library(RColorBrewer)
 ```
 
 ```{r}

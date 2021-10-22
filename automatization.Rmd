@@ -1,0 +1,170 @@
+---
+title: "Meta-analysis"
+output: html_notebook
+---
+
+directory = data
+name = GSE17351_RAW
+engine = hgu133plus2.db
+pd.hg.u133a.2
+```{r}
+performGSEA <- function(name = NA,
+                        directory = 'data', 
+                        engine = hgu133plus2.db, 
+                        absfoldlim = 2, 
+                        pajdlim = 0.05,
+                        upregulated = T)
+  {
+  location        <- paste0(directory, '/', name, '/')
+  SDRF            <- read.delim(file.path(paste0(directory, '/', name, '.txt')))
+  rownames(SDRF)  <- SDRF$sample
+  SDRF            <- AnnotatedDataFrame(SDRF)
+
+  raw_data        <- oligo::read.celfiles(paste0(location, list.files(location)),
+                                          verbose = FALSE, phenoData = SDRF)
+  norm_data       <- oligo::rma(raw_data)
+  norm_data       <- annotateEset(norm_data, engine)
+
+  design          <- model.matrix(~ 0 + factor(ifelse(SDRF@data$group == 'normal', 1, 2)))
+  colnames(design)<- c('normal', 'ESCC')
+  contrast.matrix <- makeContrasts(normal-ESCC, levels = design)
+  fit             <- lmFit(exprs(norm_data), design)
+  fit             <- contrasts.fit(fit, contrast.matrix) %>% eBayes()
+
+  results           <- topTable(fit, coef = "normal - ESCC", adjust = "BH", number = Inf)
+  filtered_results  <- results %>% filter(abs(logFC) > absfoldlim, adj.P.Val < pajdlim)
+  filtered_results$PROBEID <- rownames(filtered_results)
+
+  merged_results    <- merge(filtered_results, fData(norm_data), by = 'PROBEID') %>% 
+    dplyr::arrange(., logFC)
+  if (upregulated){
+    merged_results <- dplyr::arrange(merged_results, -logFC)
+  }
+
+  warning(paste('In this study used', raw_data@annotation, 'Make sure it is in accordance with hgu133plus2.db.'))
+  return(merged_results)
+}
+```
+
+
+
+```{r}
+x_up <- performGSEA("GSE20347_RAW")
+x_down <- performGSEA("GSE20347_RAW", upregulated = F)
+```
+
+```{r}
+y_up <- performGSEA("GSE17351_RAW")
+y_down <- performGSEA("GSE17351_RAW", upregulated = F)
+```
+
+```{r}
+z_up <- performGSEA("GSE38129_RAW")
+z_down <- performGSEA("GSE38129_RAW", upregulated = F)
+```
+
+```{r}
+u_up <- performGSEA("GSE161533_RAW")
+u_down <- performGSEA("GSE161533_RAW", upregulated = F)
+```
+
+
+
+```{r}
+glist_up <- list(na.omit(unique(x_up$SYMBOL)),
+              na.omit(unique(y_up$SYMBOL)),
+              na.omit(unique(z_up$SYMBOL)),
+              na.omit(unique(u_up$SYMBOL)))
+ranks_up <- aggregateRanks(glist = glist_up)
+
+glist_down <- list(na.omit(unique(x_down$SYMBOL)),
+              na.omit(unique(y_down$SYMBOL)),
+              na.omit(unique(z_down$SYMBOL)),
+              na.omit(unique(u_down$SYMBOL)))
+ranks_down <- aggregateRanks(glist = glist_down)
+```
+
+```{r}
+xx_up = na.omit(x_up[!duplicated(x_up$SYMBOL), c('logFC', 'SYMBOL')])
+rownames(xx_up) = xx_up$SYMBOL
+xx_down = na.omit(x_down[!duplicated(x_down$SYMBOL), c('logFC', 'SYMBOL')])
+rownames(xx_down) = xx_down$SYMBOL
+
+yy_up = na.omit(y_up[!duplicated(y_up$SYMBOL), c('logFC', 'SYMBOL')])
+rownames(yy_up) = yy_up$SYMBOL
+yy_down = na.omit(y_down[!duplicated(y_down$SYMBOL), c('logFC', 'SYMBOL')])
+rownames(yy_down) = yy_down$SYMBOL
+
+zz_up = na.omit(z_up[!duplicated(z_up$SYMBOL), c('logFC', 'SYMBOL')])
+rownames(zz_up) = zz_up$SYMBOL
+zz_down = na.omit(z_down[!duplicated(z_down$SYMBOL), c('logFC', 'SYMBOL')])
+rownames(zz_down) = zz_down$SYMBOL
+
+uu_up = na.omit(u_up[!duplicated(u_up$SYMBOL), c('logFC', 'SYMBOL')])
+rownames(uu_up) = uu_up$SYMBOL
+uu_down = na.omit(u_down[!duplicated(u_down$SYMBOL), c('logFC', 'SYMBOL')])
+rownames(uu_down) = uu_down$SYMBOL
+```
+
+```{r}
+results_up = data.frame(matrix(, 20, 4))
+colnames(results_up) = c('GSE20347', 'GSE17351', 'GSE38129', 'GSE161533')
+rownames(results_up) = ranks_up[1:20, 'Name']
+results_up
+
+results_down = data.frame(matrix(, 20, 4))
+colnames(results_down) = c('GSE20347', 'GSE17351', 'GSE38129', 'GSE161533')
+rownames(results_down) = ranks_down[1:20, 'Name']
+results_down
+```
+
+
+```{r}
+for (i in rownames(results_up)){
+  results_up[i, 'GSE20347'] = xx_up[i, 'logFC']
+  results_up[i, 'GSE17351'] = yy_up[i, 'logFC']
+  results_up[i, 'GSE38129'] = zz_up[i, 'logFC']
+  results_up[i, 'GSE161533'] = uu_up[i, 'logFC']
+}
+results_up
+
+for (i in rownames(results_down)){
+  results_down[i, 'GSE20347'] = xx_down[i, 'logFC']
+  results_down[i, 'GSE17351'] = yy_down[i, 'logFC']
+  results_down[i, 'GSE38129'] = zz_down[i, 'logFC']
+  results_down[i, 'GSE161533'] = uu_down[i, 'logFC']
+}
+results_down
+```
+
+
+```{r}
+pheatmap(-1*rbind(results_down, results_up), display_numbers = T, cellwidth = 40, cellheight = 11,
+         show_colnames = T, color = rev(brewer.pal(n = 11, name = "RdYlGn")), 
+         cluster_rows = F, cluster_cols = F)
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
