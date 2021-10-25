@@ -1,0 +1,22 @@
+In the present study, we conducted a systematic analysis of
+the biological characteristics of DEGs from nine GEO datasets (Table 1). Te overall study design is illustrated in Fig. 1. A total of 665 tissue samples, including 343 ESCC and 322 normal tissue samples, were analysed. 
+
+According to the cutof criteria of |log2 fold change (FC)|) > 2 and adjusted P < 0.05, 226 DEGs in GSE17351, 219 DEGs in GSE20347, 389 DEGs in GSE29001, 108 DEGs in GSE38129, 692 DEGs in GSE45670, 686 DEGs in GSE53625, 387 DEGs in GSE70409, 223 DEGs in GSE75241 and 147 DEGs in GSE161533 were identifed. Among the DEGs in these respective datasets, 110, 56, 168, 38, 249, 204, 115, 124 and 57 genes were upregulated, while 116, 163, 221, 70, 443, 482, 272, 99 and 90 genes were downregulated. To visualize the distributions of the DEGs, volcano plots (Supplementary Fig. S1) and heat maps (Supplementary Fig. S2) were drawn. 
+
+The RRA algorithm precluded the substantial heterogeneity and the error of each experiment caused by the diferent technological platforms and challenging statistical methods. We ranked the DEGs according to their log2FC values. Te higher a gene ranked in all the datasets, the greater was the likelihood that it was a DEG. According to analysis with false discovery rate (FDR) < 0.05, 152 robust DEGs—54 upregulated and 98 downregulated—were identifed (Supplementary Table S1). Te top 20 upregulated and downregulated robust DEGs are shown in a heat map (Fig. 2)
+
+To explore the biological classifcation of the 152 robust DEGs in ESCC, we performed GO and KEGG pathway enrichment analyses. Many biological functions enriched with the DEGs were associated with the tumor microenvironment (TME) and growth of cancer cells. GO enrichment analysis in the biological process (BP) category suggested that the robust DEGs were enriched in “extracellular matrix organization”, “extracellular structure organization” and “leukocyte chemotaxis” (Fig. 3A). In the cellular component
+(CC) category, the robust DEGs were enriched in “collagen-containing extracellular matrix”, “apical part of cell” and “endoplasmic reticulum lumen” (Fig. 3B). In the molecular function (MF) category, the robust DEGs were involved in “receptor ligand activity”, “signaling receptor activator activity”, “extracellular matrix structural”,
+“cytokine activity” and “CXCR chemokine receptor binding” (Fig. 3C). KEGG pathway analysis indicated that the robust DEGs were related to the following pathways: “IL-17 signaling pathway”, “cytokine-cytokine receptor interaction”, “ECM − receptor interaction” and “TNF signaling pathway” (Fig. 3D). Te above results suggested
+that the abnormal expression of the robust DEGs may mediate tumor progression and TME remodelling.
+
+---- 
+
+The RRA algorithm has four key features: it is robust to noise, it can handle incomplete rankings, it assigns a significance score to each element in the resulting ranking, and it is also efficient to compute. All these features are important in practice; in particular, if one wants to build a tool for interactive data analysis.
+
+
+
+
+
+
+
