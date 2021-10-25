@@ -1,0 +1,65 @@
+---
+title: "Immune cell infiltration"
+output: html_notebook
+---
+
+This analysis doesn't work
+```{r}
+library(immunedeconv)
+```
+
+```{r}
+readData <- function(name = NA,
+                        directory = 'data', 
+                        engine = hgu133plus2.db, 
+                        absfoldlim = 2, 
+                        pajdlim = 0.05,
+                        upregulated = T,
+                        best_of_all = F)
+  {
+  location        <- paste0(directory, '/', name, '/')
+  SDRF            <- read.delim(file.path(paste0(directory, '/', name, '.txt')))
+  rownames(SDRF)  <- SDRF$sample
+  SDRF            <- AnnotatedDataFrame(SDRF)
+
+  raw_data        <- oligo::read.celfiles(paste0(location, list.files(location)),
+                                          verbose = FALSE, phenoData = SDRF)
+  norm_data       <- oligo::rma(raw_data)
+  #norm_data       <- annotateEset(norm_data, engine)
+
+  return(norm_data)
+}
+```
+
+```{r}
+deconvolute(dataset_racle$expr_mat, "quantiseq", tumor = TRUE)
+```
+
+
+```{r}
+data <- readData("GSE75241_RAW", best_of_all = T)
+```
+
+
+```{r}
+Biobase::exprs(norm_data[1:5, 1:5])
+
+```
+
+
+```{r}
+x <- fData(norm_data) %>% filter(SYMBOL %in% rownames(rbind(results_up, results_down)))
+x2 <- exprs(norm_data[rownames(x[!duplicated(x$SYMBOL),]),])
+rownames(x2) = x[!duplicated(x$SYMBOL),]$SYMBOL
+x2
+```
+
+
+```{r}
+res_quantiseq = deconvolute(x2, "cibersort")
+```
+
+```{r}
+cat(rownames(rbind(results_up, results_down)), sep = ', ')
+```
+
